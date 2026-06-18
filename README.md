@@ -3,10 +3,6 @@
 
 > In every household, every team, every relationship — there's work that everyone sees... and work that nobody notices. MindShare makes it visible.
 
-[![Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
-[![Python](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](#license)
-
 ---
 
 ## 🎯 The Problem
@@ -53,7 +49,7 @@ MindShare is a guided, interactive tool that:
 ### Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mindshare.git
+git clone https://github.com/ankkits/Mindshare.git
 cd mindshare
 pip install -r requirements.txt
 ```
@@ -540,67 +536,14 @@ Disparity = Standard Deviation of all IRI values
 
 ---
 
-## 🌐 Deployment Options
-
-### Streamlit Community Cloud (Recommended — Free)
-
-1. Push this repo to GitHub
-2. Go to [share.streamlit.io](https://share.streamlit.io)
-3. Connect your repo → select `app.py` → Deploy
-4. Share the URL with anyone — no account needed to view
-
-### Render
-
-1. Create a new Web Service on [render.com](https://render.com)
-2. Connect your GitHub repo
-3. **Build Command:** `pip install -r requirements.txt`
-4. **Start Command:** `streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`
-
-### Snowflake (Streamlit in Snowflake)
-
-1. Create a Streamlit app in Snowflake workspace
-2. Paste the contents of `app.py` into `streamlit_app.py`
-3. No additional packages needed — `streamlit`, `pandas`, `altair` are pre-installed
-4. Share via Snowflake roles
-
-### Local
-
-```bash
-git clone https://github.com/YOUR_USERNAME/mindshare.git
-cd mindshare
-pip install -r requirements.txt
-streamlit run app.py
-```
-
----
-
 ## 📁 Project Structure
 
 ```
 mindshare/
 ├── app.py               ← Complete Streamlit application (single file)
 ├── requirements.txt     ← Python dependencies (3 packages)
-└── README.md            ← This file
+└── README.md            ← Documentation
 ```
-
----
-
-## 🛠️ Tech Stack
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Frontend & Backend | [Streamlit](https://streamlit.io) | UI framework, session state, forms |
-| Data Processing | [Pandas](https://pandas.pydata.org) | DataFrames, groupby, aggregation |
-| Visualization | [Altair](https://altair-viz.github.io) | Donut charts, bar charts, heatmaps, line charts |
-| Language | Python 3.8+ | Everything |
-| AI/ML | None | Pure keyword matching — no models, no training |
-| External APIs | None | Zero network calls at runtime |
-| Database | None | Session state only — data lives in browser tab |
-| Authentication | None | No login required |
-
-**Total: 3 pip packages. 1 Python file. Zero API keys. Zero external services.**
-
----
 
 ## ⚠️ Important Disclaimers
 
@@ -622,97 +565,8 @@ The keyword engine covers ~150 common activity patterns. Unusual or very vague p
 ### Overall
 **MindShare surfaces patterns, not precise measurements.** It is a tool for **awareness and conversation**, not clinical assessment or legal evidence.
 
----
 
-## 🗺️ Roadmap
-
-### Near Term
-- [ ] Persistent storage (database integration)
-- [ ] CSV upload to restore previous sessions
-- [ ] Individual mental weight per quick-pick activity
-- [ ] More follow-up topic groups
-
-### Medium Term
-- [ ] User accounts and login
-- [ ] AI-powered activity classification (LLM integration)
-- [ ] Weekly/monthly summary reports
-- [ ] Shareable household/team profiles
-- [ ] Custom scenario builder with user-defined suggestions
-
-### Long Term
-- [ ] Slack/Teams notifications for imbalance alerts
-- [ ] Mobile-friendly responsive layout
-- [ ] Multi-language support
-- [ ] Historical trend analysis across weeks/months
-- [ ] Integration with calendar apps
-- [ ] Recommendations engine for rebalancing
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Areas Where Help Is Needed
-- Expanding the keyword classification rules
-- Adding more follow-up topic groups
-- Improving the UI/UX
-- Adding persistent storage
-- Writing tests
-- Translations / i18n
-
----
-
-## 📜 License
-
-MIT License
-
-Copyright (c) 2025 [Your Name]
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
----
-
-## 👥 Team
-
-| Name | Role |
-|------|------|
-| [Your Name] | Developer |
-| [Team Member] | [Role] |
-
-*Built for [Hackathon Name] 2025*
-
----
-
-## 🙏 Acknowledgments
-
-- Inspired by the concept of [mental load](https://english.emmaclit.com/2017/05/20/you-shouldve-asked/) as illustrated by Emma Clit
-- The term "invisible labor" has been explored extensively in sociology and gender studies
-- Powered by [Streamlit](https://streamlit.io), [Pandas](https://pandas.pydata.org), and [Altair](https://altair-viz.github.io)
-
----
+*Built for Engineering the unseen 2026*
 
 <p align="center">
   <strong>You can't fix what you can't see.</strong><br>
