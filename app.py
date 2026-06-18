@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import matplotlib.pyplot as plt
-from fpdf import FPDF
-from io import BytesIO
 
 # ============================================================
 # PAGE CONFIG
@@ -309,97 +306,6 @@ def collect_unique_follow_ups(daily_log):
 
 
 # ============================================================
-# PDF EXPORT ENGINE (PURE PYTHON SETUP FOR CLOUD ARCHITECTURES)
-# ============================================================
-class MindSharePDF(FPDF):
-    def header(self):
-        self.set_font("Helvetica", "B", 16)
-        self.set_text_color(40, 50, 80)
-        self.cell(0, 10, "🧠 MindShare - Executive Burden & Insight Report", 0, 1, "L")
-        self.set_draw_color(200, 200, 200)
-        self.line(10, 22, 200, 22)
-        self.ln(8)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font("Helvetica", "I", 9)
-        self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f"Page {self.page_no()}", 0, 0, "C")
-
-
-def generate_pdf_report(df, iri_df, insights_list, category_df):
-    pdf = MindSharePDF()
-    pdf.add_page()
-    
-    # --- INSIGHTS SECTION ---
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(50, 50, 50)
-    pdf.cell(0, 8, "💡 Core Diagnostic Insights", 0, 1, "L")
-    pdf.ln(2)
-    
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(60, 60, 60)
-    for insight in insights_list:
-        clean_text = insight.replace("**", "").replace("🔴 ", "").replace("🟡 ", "").replace("🟢 ", "").replace("⚠️ ", "")
-        pdf.multi_cell(0, 6, f"- {clean_text}")
-    pdf.ln(6)
-
-    # --- IRI SCORE DATA TABLE ---
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "⚖️ Invisible Responsibility Index (IRI) Summary", 0, 1, "L")
-    pdf.ln(2)
-    
-    # Header
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.set_fill_color(230, 235, 245)
-    pdf.cell(40, 7, "User", 1, 0, "C", True)
-    pdf.cell(40, 7, "Mental Weight", 1, 0, "C", True)
-    pdf.cell(35, 7, "IRI (%)", 1, 0, "C", True)
-    pdf.cell(35, 7, "Deviation", 1, 0, "C", True)
-    pdf.cell(40, 7, "Status", 1, 1, "C", True)
-    
-    # Body
-    pdf.set_font("Helvetica", "", 10)
-    for _, row in iri_df.iterrows():
-        pdf.cell(40, 7, str(row["user"]), 1, 0, "C")
-        pdf.cell(40, 7, str(row["mental_weight"]), 1, 0, "C")
-        pdf.cell(35, 7, f"{row['IRI (%)']}%", 1, 0, "C")
-        pdf.cell(35, 7, f"{row['Deviation']:+.1f}%", 1, 0, "C")
-        pdf.cell(40, 7, str(row["Status"].replace("🔴 ", "").replace("🟡 ", "").replace("🟢 ", "").replace("⚪ ", "")), 1, 1, "C")
-    
-    pdf.ln(8)
-
-    # --- GRAPHICAL REPRESENTATIONS GENERATION via Matplotlib ---
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "📊 Visual Distribution Analysis", 0, 1, "L")
-    pdf.ln(2)
-    
-    # Chart 1: Share of Load
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5))
-    
-    colors = ['#4A90E2', '#50E3C2', '#F5A623', '#E2849A', '#9B51E0']
-    ax1.pie(iri_df["mental_weight"], labels=iri_df["user"], autopct='%1.1f%%', startangle=90, colors=colors[:len(iri_df)], wedgeprops=dict(width=0.4, edgecolor='w'))
-    ax1.set_title("Who Carries the Load? (IRI %)")
-    
-    # Chart 2: Category distribution
-    user_cats = category_df.groupby("category")["mental_weight"].sum().reset_index()
-    ax2.barh(user_cats["category"], user_cats["mental_weight"], color='#4A90E2', height=0.5)
-    ax2.set_title("Mental Weight by Category")
-    ax2.set_xlabel("Total Weight")
-    plt.tight_layout()
-    
-    img_buf = BytesIO()
-    plt.savefig(img_buf, format='png', dpi=200)
-    img_buf.seek(0)
-    plt.close(fig)
-    
-    # Insert visual image into PDF matrix safely
-    pdf.image(img_buf, x=15, w=180)
-    
-    return pdf.output()
-
-
-# ============================================================
 # SESSION STATE
 # ============================================================
 defaults = {
@@ -551,6 +457,7 @@ if st.session_state.step == "log":
     current_member = members[current_idx]
     context = st.session_state.context
 
+    # Counter to reset checkbox keys after each bulk add
     counter_key = f"add_counter_{current_member}"
     if counter_key not in st.session_state:
         st.session_state[counter_key] = 0
@@ -571,6 +478,7 @@ if st.session_state.step == "log":
         "context, stress, and cognitive load. Trust your gut."
     )
 
+        # ---- QUICK-PICK FROM SUGGESTIONS ----
     context_data = CONTEXT_SUGGESTIONS.get(context, {})
     all_hints = context_data.get("visible", []) + context_data.get("invisible", [])
 
@@ -631,7 +539,7 @@ if st.session_state.step == "log":
             st.success(f"All suggested activities have been added for {current_member}! Use the text input below for anything else.")
 
         st.markdown("---")
-
+    # ---- ALREADY LOGGED ----
     person_entries = [e for e in st.session_state.daily_log if e["user"] == current_member]
     if person_entries:
         st.markdown(f"**{current_member}'s activities so far ({len(person_entries)}):**")
@@ -649,10 +557,12 @@ if st.session_state.step == "log":
                         count += 1
                 if remove_idx is not None:
                     st.session_state.daily_log.pop(remove_idx)
+                    # Increment counter to reset checkboxes
                     st.session_state[counter_key] += 1
                 st.rerun()
         st.markdown("---")
 
+    # ---- TYPE YOUR OWN ----
     st.markdown("**Or type something not in the list:**")
 
     with st.form(f"log_{current_member}_{current_idx}", clear_on_submit=True):
@@ -677,6 +587,7 @@ if st.session_state.step == "log":
             })
             st.rerun()
 
+    # ---- NAVIGATION ----
     st.markdown("---")
     nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
 
@@ -718,12 +629,14 @@ if st.session_state.step == "hidden":
     follow_up_idx = st.session_state.follow_up_idx
 
     if not unique_groups or follow_up_idx >= len(unique_groups):
+        # Save this day's data to the all-days store
         st.session_state.all_days_data.extend(st.session_state.daily_log)
         st.session_state.all_days_hidden.extend(st.session_state.hidden_tasks)
         st.session_state.completed_dates.append(st.session_state.log_date)
         st.session_state.step = "day_done"
         st.rerun()
 
+    # Guard in case rerun is slow
     if st.session_state.step != "hidden":
         st.stop()
 
@@ -791,7 +704,7 @@ if st.session_state.step == "hidden":
     st.stop()
 
 # ============================================================
-# STEP 5B: DAY DONE
+# STEP 5B: DAY DONE — log another day or go to analysis
 # ============================================================
 if st.session_state.step == "day_done":
 
@@ -825,6 +738,7 @@ if st.session_state.step == "day_done":
 # ============================================================
 if st.session_state.step == "analyze":
 
+    # Build dataframe from ALL days
     if not st.session_state.all_days_data:
         st.warning("No data to analyze. Go back and log some days.")
         if st.button("← Back to logging"):
@@ -846,6 +760,7 @@ if st.session_state.step == "analyze":
     df["user"] = df["user"].str.strip()
     df["category"] = df["category"].str.strip()
 
+    # Sidebar filters
     with st.sidebar:
         st.header("🔍 Filters")
         all_users = sorted(df["user"].unique())
@@ -873,6 +788,7 @@ if st.session_state.step == "analyze":
         st.warning("No data matches your current filters.")
         st.stop()
 
+    # ---- SUMMARY BANNER ----
     total_tasks = len(df)
     visible_count = len(df[df["visibility"] == "Visible"])
     invisible_count = len(df[df["visibility"] == "Invisible"])
@@ -897,12 +813,14 @@ if st.session_state.step == "analyze":
         else:
             st.success(f"**{inv_pct}%** of work is invisible — a relatively balanced split.")
 
+    # ---- RAW DATA ----
     with st.expander("📋 View All Data"):
         st.dataframe(
             df[["date", "user", "activity", "category", "visibility", "mental_weight"]],
             use_container_width=True,
         )
 
+    # ---- IRI (OVERALL) ----
     st.subheader("📊 Invisible Responsibility Index (IRI)")
 
     iri_df = df.groupby("user")["mental_weight"].sum().reset_index()
@@ -966,6 +884,7 @@ if st.session_state.step == "analyze":
             use_container_width=True,
         )
 
+    # ---- FAIRNESS ----
     st.subheader("⚖️ Fairness Analysis")
 
     disparity = iri_df["IRI (%)"].std().round(1)
@@ -981,6 +900,7 @@ if st.session_state.step == "analyze":
             f"({row['Deviation']:+.1f}% from fair share) {row['Status']}"
         )
 
+    # ---- DAILY TREND TIMELINE ----
     if num_days > 1:
         st.subheader("📅 Daily Mental Load Trend")
 
@@ -999,6 +919,7 @@ if st.session_state.step == "analyze":
         )
         st.altair_chart(line_chart, use_container_width=True)
 
+        # ---- IRI PER DAY ----
         st.subheader("📈 IRI Trend Over Time")
 
         daily_iri_rows = []
@@ -1039,6 +960,7 @@ if st.session_state.step == "analyze":
             use_container_width=True,
         )
 
+        # ---- DAY-BY-DAY COMPARISON TABLE ----
         st.subheader("📋 Day-by-Day Comparison")
 
         day_comparison_rows = []
@@ -1063,6 +985,7 @@ if st.session_state.step == "analyze":
         day_comparison_df = pd.DataFrame(day_comparison_rows)
         st.dataframe(day_comparison_df, use_container_width=True)
 
+        # ---- DISPARITY TREND ----
         st.subheader("📉 Disparity Trend")
 
         disparity_rows = []
@@ -1098,6 +1021,7 @@ if st.session_state.step == "analyze":
             )
             st.altair_chart(disp_chart, use_container_width=True)
 
+    # ---- BEFORE vs AFTER ----
     st.subheader("🔬 Before vs After: Hidden Work Impact")
     st.markdown("How the picture changes once invisible work is accounted for.")
 
@@ -1153,6 +1077,7 @@ if st.session_state.step == "analyze":
             f"{abs(biggest_shift['Shift'])}pp once hidden work was accounted for."
         )
 
+    # ---- VISIBLE vs INVISIBLE ----
     st.subheader("👁️‍🗨️ Visible vs Invisible Work")
 
     vis_col1, vis_col2 = st.columns(2)
@@ -1195,6 +1120,7 @@ if st.session_state.step == "analyze":
         )
         st.altair_chart(vis_grouped, use_container_width=True)
 
+    # ---- CATEGORY BREAKDOWN ----
     st.subheader("🗂️ Mental Load by Category")
 
     category_df = df.groupby(["user", "category"])["mental_weight"].sum().reset_index()
@@ -1230,6 +1156,7 @@ if st.session_state.step == "analyze":
         )
         st.altair_chart(cat_bar, use_container_width=True)
 
+    # ---- WHO DOES WHAT ----
     st.subheader("👤 Who Does What?")
 
     for member in sorted(df["user"].unique()):
@@ -1253,6 +1180,7 @@ if st.session_state.step == "analyze":
                 use_container_width=True,
             )
 
+    # ---- TOP ACTIVITIES ----
     st.subheader("🏋️ Heaviest Mental Load Activities")
 
     top_df = df.sort_values(by="mental_weight", ascending=False).head(10)
@@ -1270,6 +1198,7 @@ if st.session_state.step == "analyze":
     )
     st.altair_chart(top_bar, use_container_width=True)
 
+    # ---- WHAT-IF REBALANCER ----
     st.subheader("🔄 What-If Rebalancer")
     st.markdown("Reassign activities and see how the balance shifts.")
 
@@ -1326,27 +1255,329 @@ if st.session_state.step == "analyze":
 
     insights = [
         f"Across **{num_days} day(s)**, **{total_tasks} activities** were recorded.",
-        f"**{highest['user']}** carries {highest['IRI (%)']}% of total mental load — {highest['IRI (%)'] - fair_share:+.1f}pp from fair share. {highest['Status']}",
+
+        f"**{highest['user']}** carries {highest['IRI (%)']}% of total mental load — "
+        f"{highest['IRI (%)'] - fair_share:+.1f}pp from fair share. {highest['Status']}",
+
         f"**{lowest['user']}** carries the least at {lowest['IRI (%)']}%.",
-        f"**{inv_pct}%** of all activities are invisible work — {'the majority of effort is unseen.' if inv_pct > 50 else 'a moderate split.'}",
-        f"**{hidden_found} hidden tasks** were uncovered through follow-up analysis." if hidden_found > 0 else "No hidden tasks were surfaced — try again and answer the follow-up prompts.",
+
+        f"**{inv_pct}%** of all activities are invisible work — "
+        f"{'⚠️ the majority of effort is unseen.' if inv_pct > 50 else 'a moderate split.'}",
+
+        f"**{hidden_found} hidden tasks** were uncovered through follow-up analysis."
+        if hidden_found > 0
+        else "No hidden tasks were surfaced — try again and answer the follow-up prompts.",
+
         f"The heaviest category is **{heaviest_category}**.",
-        f"Disparity score: **{disparity}** — {'Highly unequal distribution' if disparity > 20 else 'Moderate imbalance' if disparity > 10 else 'Reasonably balanced'}.",
+
+        f"Disparity score: **{disparity}** — "
+        f"{'🔴 Highly unequal distribution' if disparity > 20 else '🟡 Moderate imbalance' if disparity > 10 else '🟢 Reasonably balanced'}.",
     ]
 
     for insight in insights:
         st.markdown(f"- {insight}")
 
-    # ---- DOWNLOADS ----
+        # ---- GENERATE HTML REPORT ----
+    def generate_html_report(df, iri_df, fair_share, disparity, hidden_found,
+                              total_tasks, visible_count, invisible_count, num_days,
+                              impact_df, members):
+        """Generate a comprehensive HTML report."""
+        inv_pct = round(invisible_count / max(total_tasks, 1) * 100, 1)
+        highest = iri_df.sort_values("IRI (%)", ascending=False).iloc[0]
+        lowest = iri_df.sort_values("IRI (%)", ascending=True).iloc[0]
+        heaviest_category = df.groupby("category")["mental_weight"].sum().sort_values(ascending=False).index[0]
+
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MindShare Report</title>
+<style>
+    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a2e; background: #f8f9fa; padding: 40px; max-width: 1000px; margin: 0 auto; }}
+    h1 {{ font-size: 2.2em; color: #1a1a2e; text-align: center; margin-bottom: 5px; }}
+    .subtitle {{ text-align: center; color: #666; font-size: 1.1em; margin-bottom: 30px; }}
+    h2 {{ font-size: 1.4em; color: #1a1a2e; margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 3px solid #FF4B4B; }}
+    h3 {{ font-size: 1.1em; color: #333; margin: 20px 0 10px 0; }}
+    .meta {{ background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }}
+    .meta span {{ display: inline-block; margin-right: 25px; color: #555; }}
+    .meta strong {{ color: #1a1a2e; }}
+    .cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0; }}
+    .card {{ background: #fff; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }}
+    .card .number {{ font-size: 2em; font-weight: 700; color: #FF4B4B; }}
+    .card .label {{ font-size: 0.85em; color: #666; margin-top: 5px; }}
+    .iri-card {{ background: #fff; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }}
+    .iri-card .name {{ font-size: 1.1em; font-weight: 600; color: #333; }}
+    .iri-card .pct {{ font-size: 2.2em; font-weight: 700; color: #FF4B4B; }}
+    .iri-card .deviation {{ font-size: 0.9em; color: #666; }}
+    .iri-card .status {{ font-size: 0.85em; margin-top: 5px; padding: 3px 10px; border-radius: 20px; display: inline-block; }}
+    .status-over {{ background: #ffebee; color: #c62828; }}
+    .status-high {{ background: #fff3e0; color: #e65100; }}
+    .status-ok {{ background: #e8f5e9; color: #2e7d32; }}
+    .status-under {{ background: #f5f5f5; color: #757575; }}
+    table {{ width: 100%; border-collapse: collapse; margin: 15px 0; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }}
+    th {{ background: #1a1a2e; color: #fff; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px; }}
+    td {{ padding: 10px 15px; border-bottom: 1px solid #eee; font-size: 0.9em; }}
+    tr:hover {{ background: #f8f9fa; }}
+    .tag {{ display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }}
+    .tag-visible {{ background: #e8f5e9; color: #2e7d32; }}
+    .tag-invisible {{ background: #fce4ec; color: #c62828; }}
+    .insight {{ background: #fff; border-left: 4px solid #FF4B4B; padding: 12px 20px; margin: 8px 0; border-radius: 0 8px 8px 0; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }}
+    .callout {{ background: #fff3e0; border-radius: 12px; padding: 15px 20px; margin: 15px 0; border-left: 4px solid #FF9800; }}
+    .callout-red {{ background: #ffebee; border-left-color: #f44336; }}
+    .callout-green {{ background: #e8f5e9; border-left-color: #4CAF50; }}
+    .bar-container {{ background: #eee; border-radius: 10px; height: 24px; margin: 4px 0; position: relative; overflow: hidden; }}
+    .bar-fill {{ height: 100%; border-radius: 10px; display: flex; align-items: center; padding-left: 10px; color: #fff; font-size: 0.8em; font-weight: 600; min-width: 40px; }}
+    .bar-visible {{ background: #4CAF50; }}
+    .bar-invisible {{ background: #FF5722; }}
+    .section {{ margin-bottom: 35px; }}
+    .footer {{ text-align: center; color: #999; font-size: 0.8em; margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; }}
+    .two-col {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
+    @media print {{
+        body {{ padding: 20px; }}
+        .card, .iri-card, table {{ break-inside: avoid; }}
+        h2 {{ break-after: avoid; }}
+    }}
+    @media (max-width: 600px) {{
+        .cards {{ grid-template-columns: 1fr 1fr; }}
+        .two-col {{ grid-template-columns: 1fr; }}
+        body {{ padding: 15px; }}
+    }}
+</style>
+</head>
+<body>
+
+<h1>🧠 MindShare Report</h1>
+<p class="subtitle">Making Invisible Mental Work Visible</p>
+
+<div class="meta">
+    <span><strong>Context:</strong> {st.session_state.context}</span>
+    <span><strong>People:</strong> {', '.join(members)}</span>
+    <span><strong>Days:</strong> {', '.join(st.session_state.completed_dates)}</span>
+    <span><strong>Generated:</strong> {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}</span>
+</div>
+
+<!-- SUMMARY CARDS -->
+<div class="section">
+<h2>📊 The Big Picture</h2>
+<div class="cards">
+    <div class="card"><div class="number">{num_days}</div><div class="label">Days Logged</div></div>
+    <div class="card"><div class="number">{total_tasks}</div><div class="label">Total Activities</div></div>
+    <div class="card"><div class="number">{visible_count}</div><div class="label">Visible Tasks</div></div>
+    <div class="card"><div class="number">{invisible_count}</div><div class="label">Invisible Tasks</div></div>
+    <div class="card"><div class="number">{hidden_found}</div><div class="label">Hidden Uncovered</div></div>
+</div>
+"""
+
+        # Invisible percentage callout
+        if inv_pct > 60:
+            html += f'<div class="callout callout-red">⚠️ <strong>{inv_pct}%</strong> of all work is invisible — the majority of effort is unseen.</div>'
+        elif inv_pct > 40:
+            html += f'<div class="callout">⚡ <strong>{inv_pct}%</strong> of all work is invisible — a significant hidden burden.</div>'
+        else:
+            html += f'<div class="callout callout-green">✅ <strong>{inv_pct}%</strong> of work is invisible — a relatively balanced split.</div>'
+
+        html += '</div>'
+
+        # ---- IRI SECTION ----
+        html += '<div class="section"><h2>📊 Invisible Responsibility Index (IRI)</h2>'
+        html += '<p style="color:#666; margin-bottom:15px;">IRI (%) = Person\'s Total Mental Weight ÷ Everyone\'s Total × 100. Fair share per person: <strong>' + str(fair_share) + '%</strong></p>'
+        html += '<div class="cards">'
+
+        for _, row in iri_df.iterrows():
+            dev = row["Deviation"]
+            if dev > 15:
+                status_class = "status-over"
+                status_text = "Overburdened"
+            elif dev > 5:
+                status_class = "status-high"
+                status_text = "Slightly High"
+            elif dev >= -5:
+                status_class = "status-ok"
+                status_text = "Balanced"
+            else:
+                status_class = "status-under"
+                status_text = "Underloaded"
+
+            html += f'''<div class="iri-card">
+                <div class="name">{row["user"]}</div>
+                <div class="pct">{row["IRI (%)"]}%</div>
+                <div class="deviation">{row["Deviation"]:+.1f}% from fair share</div>
+                <div class="status {status_class}">{status_text}</div>
+            </div>'''
+
+        html += '</div>'
+
+        # Disparity
+        disp_label = "Highly unequal" if disparity > 20 else "Moderate imbalance" if disparity > 10 else "Reasonably balanced"
+        html += f'<p style="margin-top:15px; color:#555;">Disparity Score: <strong>{disparity}</strong> — {disp_label}</p>'
+        html += '</div>'
+
+        # ---- BEFORE vs AFTER ----
+        html += '<div class="section"><h2>🔬 Before vs After: Hidden Work Impact</h2>'
+        html += '<table><tr><th>Person</th><th>Before IRI (%)</th><th>After IRI (%)</th><th>Shift (pp)</th></tr>'
+
+        for _, row in impact_df.iterrows():
+            shift_color = "color:#c62828" if row["Shift"] > 0 else "color:#2e7d32" if row["Shift"] < 0 else ""
+            html += f'<tr><td>{row["user"]}</td><td>{row["Before IRI (%)"]}%</td><td>{row["After IRI (%)"]}%</td><td style="{shift_color}; font-weight:600">{row["Shift"]:+.1f}</td></tr>'
+
+        html += '</table>'
+
+        if hidden_found > 0 and len(impact_df) > 0:
+            biggest = impact_df.loc[impact_df["Shift"].abs().idxmax()]
+            direction = "increased" if biggest["Shift"] > 0 else "decreased"
+            html += f'<div class="callout"><strong>{biggest["user"]}</strong>\'s share {direction} by {abs(biggest["Shift"])}pp once hidden work was accounted for.</div>'
+
+        html += '</div>'
+
+        # ---- VISIBLE vs INVISIBLE BARS ----
+        html += '<div class="section"><h2>👁️‍🗨️ Visible vs Invisible Work</h2>'
+
+        for member in sorted(df["user"].unique()):
+            member_df = df[df["user"] == member]
+            m_vis = len(member_df[member_df["visibility"] == "Visible"])
+            m_inv = len(member_df[member_df["visibility"] == "Invisible"])
+            m_total = max(m_vis + m_inv, 1)
+            vis_pct = round(m_vis / m_total * 100)
+            inv_pct_m = round(m_inv / m_total * 100)
+
+            html += f'<h3>{member}</h3>'
+            html += f'<div style="display:flex; gap:5px; align-items:center; margin-bottom:3px;"><span style="width:70px; font-size:0.85em; color:#666;">Visible</span><div class="bar-container" style="flex:1;"><div class="bar-fill bar-visible" style="width:{vis_pct}%">{m_vis}</div></div></div>'
+            html += f'<div style="display:flex; gap:5px; align-items:center;"><span style="width:70px; font-size:0.85em; color:#666;">Invisible</span><div class="bar-container" style="flex:1;"><div class="bar-fill bar-invisible" style="width:{inv_pct_m}%">{m_inv}</div></div></div>'
+
+        html += '</div>'
+
+        # ---- CATEGORY TABLE ----
+        html += '<div class="section"><h2>🗂️ Mental Load by Category</h2>'
+
+        cat_data = df.groupby(["user", "category"])["mental_weight"].sum().reset_index()
+        categories = sorted(df["category"].unique())
+
+        html += '<table><tr><th>Person</th>'
+        for cat in categories:
+            html += f'<th>{cat}</th>'
+        html += '<th>Total</th></tr>'
+
+        for member in sorted(df["user"].unique()):
+            html += f'<tr><td><strong>{member}</strong></td>'
+            row_total = 0
+            for cat in categories:
+                val = cat_data[(cat_data["user"] == member) & (cat_data["category"] == cat)]["mental_weight"].sum()
+                row_total += val
+                cell_style = 'style="background:#fff3e0; font-weight:600;"' if val > 10 else ""
+                html += f'<td {cell_style}>{int(val) if val > 0 else "—"}</td>'
+            html += f'<td><strong>{int(row_total)}</strong></td></tr>'
+
+        html += '</table></div>'
+
+        # ---- PERSON DETAILS ----
+        html += '<div class="section"><h2>👤 Who Does What?</h2>'
+
+        for member in sorted(df["user"].unique()):
+            member_df = df[df["user"] == member].sort_values("mental_weight", ascending=False)
+            m_vis = len(member_df[member_df["visibility"] == "Visible"])
+            m_inv = len(member_df[member_df["visibility"] == "Invisible"])
+            m_weight = member_df["mental_weight"].sum()
+            m_inv_pct = round(m_inv / max(len(member_df), 1) * 100)
+
+            html += f'<h3>{member} — {len(member_df)} activities, total weight: {m_weight} (Invisible: {m_inv_pct}%)</h3>'
+            html += '<table><tr><th>Date</th><th>Activity</th><th>Category</th><th>Type</th><th>Weight</th></tr>'
+
+            for _, row in member_df.iterrows():
+                tag_class = "tag-visible" if row["visibility"] == "Visible" else "tag-invisible"
+                html += f'<tr><td>{row["date"]}</td><td>{row["activity"]}</td><td>{row["category"]}</td><td><span class="tag {tag_class}">{row["visibility"]}</span></td><td><strong>{row["mental_weight"]}</strong></td></tr>'
+
+            html += '</table>'
+
+        html += '</div>'
+
+        # ---- TOP 10 ----
+        html += '<div class="section"><h2>🏋️ Top 10 Heaviest Activities</h2>'
+        html += '<table><tr><th>#</th><th>Date</th><th>Person</th><th>Activity</th><th>Category</th><th>Weight</th></tr>'
+
+        top = df.sort_values("mental_weight", ascending=False).head(10)
+        for rank, (_, row) in enumerate(top.iterrows(), 1):
+            html += f'<tr><td>{rank}</td><td>{row["date"]}</td><td>{row["user"]}</td><td>{row["activity"]}</td><td>{row["category"]}</td><td><strong>{row["mental_weight"]}</strong></td></tr>'
+
+        html += '</table></div>'
+
+        # ---- DAY-BY-DAY TABLE (multi-day) ----
+        if num_days > 1:
+            html += '<div class="section"><h2>📋 Day-by-Day Comparison</h2>'
+            html += '<table><tr><th>Date</th><th>Person</th><th>Tasks</th><th>Invisible</th><th>Mental Weight</th><th>IRI (%)</th></tr>'
+
+            for date in sorted(df["date"].unique()):
+                day_df = df[df["date"] == date]
+                day_total = day_df["mental_weight"].sum()
+                for member in members:
+                    user_day = day_df[day_df["user"] == member]
+                    u_weight = user_day["mental_weight"].sum()
+                    u_tasks = len(user_day)
+                    u_inv = len(user_day[user_day["visibility"] == "Invisible"])
+                    u_iri = round(u_weight / day_total * 100, 1) if day_total > 0 else 0
+
+                    html += f'<tr><td>{date}</td><td>{member}</td><td>{u_tasks}</td><td>{u_inv}</td><td>{int(u_weight)}</td><td>{u_iri}%</td></tr>'
+
+            html += '</table></div>'
+
+        # ---- INSIGHTS ----
+        html += '<div class="section"><h2>💡 Insights</h2>'
+
+        insights = [
+            f"Across {num_days} day(s), {total_tasks} activities were recorded.",
+            f"<strong>{highest['user']}</strong> carries {highest['IRI (%)']}% of total mental load — {highest['IRI (%)'] - fair_share:+.1f}pp from fair share.",
+            f"<strong>{lowest['user']}</strong> carries the least at {lowest['IRI (%)']}%.",
+            f"<strong>{inv_pct}%</strong> of all activities are invisible work.",
+            f"<strong>{hidden_found} hidden tasks</strong> were uncovered through follow-up analysis." if hidden_found > 0 else "No hidden tasks were surfaced.",
+            f"The heaviest category is <strong>{heaviest_category}</strong>.",
+            f"Disparity score: <strong>{disparity}</strong> — {disp_label}.",
+        ]
+
+        for insight in insights:
+            html += f'<div class="insight">{insight}</div>'
+
+        html += '</div>'
+
+        # ---- FOOTER ----
+        html += f'''
+<div class="footer">
+    <p><strong>⚠️ Disclaimer:</strong> Mental weights are self-reported. Hidden task weights are estimated defaults.
+    MindShare surfaces patterns for awareness and conversation, not clinical assessment.</p>
+    <p style="margin-top:10px;">🧠 Generated by <strong>MindShare</strong> — Making Invisible Mental Work Visible</p>
+</div>
+
+</body>
+</html>'''
+
+        return html
+
+    # ---- DOWNLOAD SECTION ----
     st.divider()
+    st.subheader("📥 Download Reports")
 
     with st.expander("📋 View Complete Dataset"):
         st.dataframe(df, use_container_width=True)
 
+    # Generate HTML report
+    html_report = generate_html_report(
+        df=df,
+        iri_df=iri_df,
+        fair_share=fair_share,
+        disparity=disparity,
+        hidden_found=hidden_found,
+        total_tasks=total_tasks,
+        visible_count=visible_count,
+        invisible_count=invisible_count,
+        num_days=num_days,
+        impact_df=impact,
+        members=st.session_state.members,
+    )
+
     col_dl1, col_dl2, col_dl3 = st.columns(3)
 
     col_dl1.download_button(
-        "📥 Download Full CSV Data",
+        "📥 Full Data (CSV)",
         df.to_csv(index=False),
         "mindshare_data.csv",
         "text/csv",
@@ -1354,22 +1585,19 @@ if st.session_state.step == "analyze":
     )
 
     col_dl2.download_button(
-        "📥 Download IRI CSV Report",
+        "📥 IRI Report (CSV)",
         iri_df.to_csv(index=False),
         "mindshare_iri_report.csv",
         "text/csv",
         use_container_width=True,
     )
 
-    # Compile PDF Report Binary Data
-    try:
-        pdf_data = generate_pdf_report(df, iri_df, insights, category_df)
-        col_dl3.download_button(
-            label="📥 Download PDF Insight Report",
-            data=pdf_data,
-            file_name="mindshare_executive_insight_report.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
-    except Exception as e:
-        col_dl3.error(f"Error compiling PDF: {e}")
+    col_dl3.download_button(
+        "📥 Full Report (HTML)",
+        html_report,
+        "mindshare_report.html",
+        "text/html",
+        use_container_width=True,
+    )
+
+    st.caption("💡 Open the HTML report in any browser. Use **Ctrl+P** (or **Cmd+P** on Mac) to print or save as PDF.")
