@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+import matplotlib.pyplot as plt
+from fpdf import FPDF
+from io import BytesIO
 
 # ============================================================
 # PAGE CONFIG
@@ -306,6 +309,97 @@ def collect_unique_follow_ups(daily_log):
 
 
 # ============================================================
+# PDF EXPORT ENGINE (PURE PYTHON SETUP FOR CLOUD ARCHITECTURES)
+# ============================================================
+class MindSharePDF(FPDF):
+    def header(self):
+        self.set_font("Helvetica", "B", 16)
+        self.set_text_color(40, 50, 80)
+        self.cell(0, 10, "🧠 MindShare - Executive Burden & Insight Report", 0, 1, "L")
+        self.set_draw_color(200, 200, 200)
+        self.line(10, 22, 200, 22)
+        self.ln(8)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Helvetica", "I", 9)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, f"Page {self.page_no()}", 0, 0, "C")
+
+
+def generate_pdf_report(df, iri_df, insights_list, category_df):
+    pdf = MindSharePDF()
+    pdf.add_page()
+    
+    # --- INSIGHTS SECTION ---
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(50, 50, 50)
+    pdf.cell(0, 8, "💡 Core Diagnostic Insights", 0, 1, "L")
+    pdf.ln(2)
+    
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(60, 60, 60)
+    for insight in insights_list:
+        clean_text = insight.replace("**", "").replace("🔴 ", "").replace("🟡 ", "").replace("🟢 ", "").replace("⚠️ ", "")
+        pdf.multi_cell(0, 6, f"- {clean_text}")
+    pdf.ln(6)
+
+    # --- IRI SCORE DATA TABLE ---
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "⚖️ Invisible Responsibility Index (IRI) Summary", 0, 1, "L")
+    pdf.ln(2)
+    
+    # Header
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_fill_color(230, 235, 245)
+    pdf.cell(40, 7, "User", 1, 0, "C", True)
+    pdf.cell(40, 7, "Mental Weight", 1, 0, "C", True)
+    pdf.cell(35, 7, "IRI (%)", 1, 0, "C", True)
+    pdf.cell(35, 7, "Deviation", 1, 0, "C", True)
+    pdf.cell(40, 7, "Status", 1, 1, "C", True)
+    
+    # Body
+    pdf.set_font("Helvetica", "", 10)
+    for _, row in iri_df.iterrows():
+        pdf.cell(40, 7, str(row["user"]), 1, 0, "C")
+        pdf.cell(40, 7, str(row["mental_weight"]), 1, 0, "C")
+        pdf.cell(35, 7, f"{row['IRI (%)']}%", 1, 0, "C")
+        pdf.cell(35, 7, f"{row['Deviation']:+.1f}%", 1, 0, "C")
+        pdf.cell(40, 7, str(row["Status"].replace("🔴 ", "").replace("🟡 ", "").replace("🟢 ", "").replace("⚪ ", "")), 1, 1, "C")
+    
+    pdf.ln(8)
+
+    # --- GRAPHICAL REPRESENTATIONS GENERATION via Matplotlib ---
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "📊 Visual Distribution Analysis", 0, 1, "L")
+    pdf.ln(2)
+    
+    # Chart 1: Share of Load
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5))
+    
+    colors = ['#4A90E2', '#50E3C2', '#F5A623', '#E2849A', '#9B51E0']
+    ax1.pie(iri_df["mental_weight"], labels=iri_df["user"], autopct='%1.1f%%', startangle=90, colors=colors[:len(iri_df)], wedgeprops=dict(width=0.4, edgecolor='w'))
+    ax1.set_title("Who Carries the Load? (IRI %)")
+    
+    # Chart 2: Category distribution
+    user_cats = category_df.groupby("category")["mental_weight"].sum().reset_index()
+    ax2.barh(user_cats["category"], user_cats["mental_weight"], color='#4A90E2', height=0.5)
+    ax2.set_title("Mental Weight by Category")
+    ax2.set_xlabel("Total Weight")
+    plt.tight_layout()
+    
+    img_buf = BytesIO()
+    plt.savefig(img_buf, format='png', dpi=200)
+    img_buf.seek(0)
+    plt.close(fig)
+    
+    # Insert visual image into PDF matrix safely
+    pdf.image(img_buf, x=15, w=180)
+    
+    return pdf.output()
+
+
+# ============================================================
 # SESSION STATE
 # ============================================================
 defaults = {
@@ -457,7 +551,6 @@ if st.session_state.step == "log":
     current_member = members[current_idx]
     context = st.session_state.context
 
-    # Counter to reset checkbox keys after each bulk add
     counter_key = f"add_counter_{current_member}"
     if counter_key not in st.session_state:
         st.session_state[counter_key] = 0
@@ -478,7 +571,6 @@ if st.session_state.step == "log":
         "context, stress, and cognitive load. Trust your gut."
     )
 
-        # ---- QUICK-PICK FROM SUGGESTIONS ----
     context_data = CONTEXT_SUGGESTIONS.get(context, {})
     all_hints = context_data.get("visible", []) + context_data.get("invisible", [])
 
@@ -539,7 +631,7 @@ if st.session_state.step == "log":
             st.success(f"All suggested activities have been added for {current_member}! Use the text input below for anything else.")
 
         st.markdown("---")
-    # ---- ALREADY LOGGED ----
+
     person_entries = [e for e in st.session_state.daily_log if e["user"] == current_member]
     if person_entries:
         st.markdown(f"**{current_member}'s activities so far ({len(person_entries)}):**")
@@ -557,12 +649,10 @@ if st.session_state.step == "log":
                         count += 1
                 if remove_idx is not None:
                     st.session_state.daily_log.pop(remove_idx)
-                    # Increment counter to reset checkboxes
                     st.session_state[counter_key] += 1
                 st.rerun()
         st.markdown("---")
 
-    # ---- TYPE YOUR OWN ----
     st.markdown("**Or type something not in the list:**")
 
     with st.form(f"log_{current_member}_{current_idx}", clear_on_submit=True):
@@ -587,7 +677,6 @@ if st.session_state.step == "log":
             })
             st.rerun()
 
-    # ---- NAVIGATION ----
     st.markdown("---")
     nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
 
@@ -629,14 +718,12 @@ if st.session_state.step == "hidden":
     follow_up_idx = st.session_state.follow_up_idx
 
     if not unique_groups or follow_up_idx >= len(unique_groups):
-        # Save this day's data to the all-days store
         st.session_state.all_days_data.extend(st.session_state.daily_log)
         st.session_state.all_days_hidden.extend(st.session_state.hidden_tasks)
         st.session_state.completed_dates.append(st.session_state.log_date)
         st.session_state.step = "day_done"
         st.rerun()
 
-    # Guard in case rerun is slow
     if st.session_state.step != "hidden":
         st.stop()
 
@@ -704,7 +791,7 @@ if st.session_state.step == "hidden":
     st.stop()
 
 # ============================================================
-# STEP 5B: DAY DONE — log another day or go to analysis
+# STEP 5B: DAY DONE
 # ============================================================
 if st.session_state.step == "day_done":
 
@@ -738,7 +825,6 @@ if st.session_state.step == "day_done":
 # ============================================================
 if st.session_state.step == "analyze":
 
-    # Build dataframe from ALL days
     if not st.session_state.all_days_data:
         st.warning("No data to analyze. Go back and log some days.")
         if st.button("← Back to logging"):
@@ -760,7 +846,6 @@ if st.session_state.step == "analyze":
     df["user"] = df["user"].str.strip()
     df["category"] = df["category"].str.strip()
 
-    # Sidebar filters
     with st.sidebar:
         st.header("🔍 Filters")
         all_users = sorted(df["user"].unique())
@@ -788,7 +873,6 @@ if st.session_state.step == "analyze":
         st.warning("No data matches your current filters.")
         st.stop()
 
-    # ---- SUMMARY BANNER ----
     total_tasks = len(df)
     visible_count = len(df[df["visibility"] == "Visible"])
     invisible_count = len(df[df["visibility"] == "Invisible"])
@@ -813,14 +897,12 @@ if st.session_state.step == "analyze":
         else:
             st.success(f"**{inv_pct}%** of work is invisible — a relatively balanced split.")
 
-    # ---- RAW DATA ----
     with st.expander("📋 View All Data"):
         st.dataframe(
             df[["date", "user", "activity", "category", "visibility", "mental_weight"]],
             use_container_width=True,
         )
 
-    # ---- IRI (OVERALL) ----
     st.subheader("📊 Invisible Responsibility Index (IRI)")
 
     iri_df = df.groupby("user")["mental_weight"].sum().reset_index()
@@ -884,7 +966,6 @@ if st.session_state.step == "analyze":
             use_container_width=True,
         )
 
-    # ---- FAIRNESS ----
     st.subheader("⚖️ Fairness Analysis")
 
     disparity = iri_df["IRI (%)"].std().round(1)
@@ -900,7 +981,6 @@ if st.session_state.step == "analyze":
             f"({row['Deviation']:+.1f}% from fair share) {row['Status']}"
         )
 
-    # ---- DAILY TREND TIMELINE ----
     if num_days > 1:
         st.subheader("📅 Daily Mental Load Trend")
 
@@ -919,7 +999,6 @@ if st.session_state.step == "analyze":
         )
         st.altair_chart(line_chart, use_container_width=True)
 
-        # ---- IRI PER DAY ----
         st.subheader("📈 IRI Trend Over Time")
 
         daily_iri_rows = []
@@ -960,7 +1039,6 @@ if st.session_state.step == "analyze":
             use_container_width=True,
         )
 
-        # ---- DAY-BY-DAY COMPARISON TABLE ----
         st.subheader("📋 Day-by-Day Comparison")
 
         day_comparison_rows = []
@@ -985,7 +1063,6 @@ if st.session_state.step == "analyze":
         day_comparison_df = pd.DataFrame(day_comparison_rows)
         st.dataframe(day_comparison_df, use_container_width=True)
 
-        # ---- DISPARITY TREND ----
         st.subheader("📉 Disparity Trend")
 
         disparity_rows = []
@@ -1021,7 +1098,6 @@ if st.session_state.step == "analyze":
             )
             st.altair_chart(disp_chart, use_container_width=True)
 
-    # ---- BEFORE vs AFTER ----
     st.subheader("🔬 Before vs After: Hidden Work Impact")
     st.markdown("How the picture changes once invisible work is accounted for.")
 
@@ -1077,7 +1153,6 @@ if st.session_state.step == "analyze":
             f"{abs(biggest_shift['Shift'])}pp once hidden work was accounted for."
         )
 
-    # ---- VISIBLE vs INVISIBLE ----
     st.subheader("👁️‍🗨️ Visible vs Invisible Work")
 
     vis_col1, vis_col2 = st.columns(2)
@@ -1120,7 +1195,6 @@ if st.session_state.step == "analyze":
         )
         st.altair_chart(vis_grouped, use_container_width=True)
 
-    # ---- CATEGORY BREAKDOWN ----
     st.subheader("🗂️ Mental Load by Category")
 
     category_df = df.groupby(["user", "category"])["mental_weight"].sum().reset_index()
@@ -1156,7 +1230,6 @@ if st.session_state.step == "analyze":
         )
         st.altair_chart(cat_bar, use_container_width=True)
 
-    # ---- WHO DOES WHAT ----
     st.subheader("👤 Who Does What?")
 
     for member in sorted(df["user"].unique()):
@@ -1180,7 +1253,6 @@ if st.session_state.step == "analyze":
                 use_container_width=True,
             )
 
-    # ---- TOP ACTIVITIES ----
     st.subheader("🏋️ Heaviest Mental Load Activities")
 
     top_df = df.sort_values(by="mental_weight", ascending=False).head(10)
@@ -1198,7 +1270,6 @@ if st.session_state.step == "analyze":
     )
     st.altair_chart(top_bar, use_container_width=True)
 
-    # ---- WHAT-IF REBALANCER ----
     st.subheader("🔄 What-If Rebalancer")
     st.markdown("Reassign activities and see how the balance shifts.")
 
@@ -1255,38 +1326,27 @@ if st.session_state.step == "analyze":
 
     insights = [
         f"Across **{num_days} day(s)**, **{total_tasks} activities** were recorded.",
-
-        f"**{highest['user']}** carries {highest['IRI (%)']}% of total mental load — "
-        f"{highest['IRI (%)'] - fair_share:+.1f}pp from fair share. {highest['Status']}",
-
+        f"**{highest['user']}** carries {highest['IRI (%)']}% of total mental load — {highest['IRI (%)'] - fair_share:+.1f}pp from fair share. {highest['Status']}",
         f"**{lowest['user']}** carries the least at {lowest['IRI (%)']}%.",
-
-        f"**{inv_pct}%** of all activities are invisible work — "
-        f"{'⚠️ the majority of effort is unseen.' if inv_pct > 50 else 'a moderate split.'}",
-
-        f"**{hidden_found} hidden tasks** were uncovered through follow-up analysis."
-        if hidden_found > 0
-        else "No hidden tasks were surfaced — try again and answer the follow-up prompts.",
-
+        f"**{inv_pct}%** of all activities are invisible work — {'the majority of effort is unseen.' if inv_pct > 50 else 'a moderate split.'}",
+        f"**{hidden_found} hidden tasks** were uncovered through follow-up analysis." if hidden_found > 0 else "No hidden tasks were surfaced — try again and answer the follow-up prompts.",
         f"The heaviest category is **{heaviest_category}**.",
-
-        f"Disparity score: **{disparity}** — "
-        f"{'🔴 Highly unequal distribution' if disparity > 20 else '🟡 Moderate imbalance' if disparity > 10 else '🟢 Reasonably balanced'}.",
+        f"Disparity score: **{disparity}** — {'Highly unequal distribution' if disparity > 20 else 'Moderate imbalance' if disparity > 10 else 'Reasonably balanced'}.",
     ]
 
     for insight in insights:
         st.markdown(f"- {insight}")
 
-    # ---- DOWNLOAD ----
+    # ---- DOWNLOADS ----
     st.divider()
 
     with st.expander("📋 View Complete Dataset"):
         st.dataframe(df, use_container_width=True)
 
-    col_dl1, col_dl2 = st.columns(2)
+    col_dl1, col_dl2, col_dl3 = st.columns(3)
 
     col_dl1.download_button(
-        "📥 Download Full Data",
+        "📥 Download Full CSV Data",
         df.to_csv(index=False),
         "mindshare_data.csv",
         "text/csv",
@@ -1294,9 +1354,22 @@ if st.session_state.step == "analyze":
     )
 
     col_dl2.download_button(
-        "📥 Download IRI Report",
+        "📥 Download IRI CSV Report",
         iri_df.to_csv(index=False),
         "mindshare_iri_report.csv",
         "text/csv",
         use_container_width=True,
     )
+
+    # Compile PDF Report Binary Data
+    try:
+        pdf_data = generate_pdf_report(df, iri_df, insights, category_df)
+        col_dl3.download_button(
+            label="📥 Download PDF Insight Report",
+            data=pdf_data,
+            file_name="mindshare_executive_insight_report.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+    except Exception as e:
+        col_dl3.error(f"Error compiling PDF: {e}")
