@@ -1,9 +1,8 @@
 ```markdown
 # 🧠 MindShare — Making Invisible Mental Work Visible
 
-> In every household, every team, every relationship — there's work that everyone sees... and work that nobody notices. MindShare makes it visible.
-
----
+> In every household, every team, every relationship — there's work that everyone sees... and work that nobody notices. 
+    MindShare makes it visible.
 
 ## 🎯 The Problem
 
